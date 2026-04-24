@@ -68,3 +68,19 @@ def calculate_dcf(
         "Fair Value Per Share": fair_value_per_share,
         "Discounted Cash Flows": projected_cash_flows,
     }
+
+
+def get_stock_news(ticker):
+    stock = yf.Ticker(ticker)
+    news = stock.news
+
+    articles = []
+
+    for item in news[:5]:
+        articles.append({
+            "Title": item.get("title"),
+            "Publisher": item.get("publisher"),
+            "Link": item.get("link")
+        })
+
+    return articles
