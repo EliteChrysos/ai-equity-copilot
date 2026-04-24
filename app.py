@@ -6,6 +6,29 @@ from prompts import equity_prompt, pdf_report_prompt, comparison_prompt
 from ai import get_ai_analysis
 from report_generator import create_pdf_report
 
+st.markdown("""
+    <style>
+    .main {
+        background-color: #0E1117;
+        color: white;
+    }
+    .stTextInput>div>div>input {
+        background-color: #1E222A;
+        color: white;
+    }
+    .stNumberInput input {
+        background-color: #1E222A;
+        color: white;
+    }
+    .stButton>button {
+        background-color: #FF9900;
+        color: black;
+        border-radius: 6px;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 def save_report(ticker, report_text):
     folder_name = "saved_reports"
 
@@ -27,7 +50,9 @@ st.set_page_config(
 )
 
 st.title("AI Equity Research Copilot")
+st.info("Analyze companies, generate AI research reports, perform valuations, and compare stocks — all in one place.")
 st.caption("AI-powered equity research, valuation, financial insights, and company comparison.")
+
 
 section = st.sidebar.radio(
     "Navigation",
@@ -40,7 +65,7 @@ section = st.sidebar.radio(
 )
 
 if section == "Stock Analysis":
-    st.header("Stock Analysis")
+    st.markdown("## 📊 Stock Analysis")
 
     ticker = st.text_input("Enter Stock Ticker", placeholder="Example: AAPL, MSFT, TSLA")
 
@@ -101,7 +126,7 @@ if section == "Stock Analysis":
 
 
 if section == "Annual Report PDF":
-    st.header("Analyze Annual Report PDF")
+   st.markdown("## 📄 Annual Report PDF")
 
     uploaded_file = st.file_uploader("Upload annual report PDF", type=["pdf"])
 
@@ -124,7 +149,7 @@ if section == "Annual Report PDF":
 
 
 if section == "DCF Calculator":
-    st.header("Basic DCF Valuation Calculator")
+    st.markdown("## 📉 DCF Calculator")
 
     free_cash_flow = st.number_input("Free Cash Flow", value=1000000000.0)
     growth_rate = st.number_input("Growth Rate (%)", value=5.0) / 100
@@ -149,7 +174,7 @@ if section == "DCF Calculator":
 
 
 if section == "Company Comparison":
-    st.header("Compare Two Companies")
+     st.markdown("## ⚔️ Company Comparison")
 
     ticker1 = st.text_input("First Company Ticker", placeholder="Example: AAPL")
     ticker2 = st.text_input("Second Company Ticker", placeholder="Example: MSFT")
