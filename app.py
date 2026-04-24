@@ -176,10 +176,10 @@ if section == "DCF Calculator":
 if section == "Company Comparison":
      st.markdown("## ⚔️ Company Comparison")
 
-    ticker1 = st.text_input("First Company Ticker", placeholder="Example: AAPL")
-    ticker2 = st.text_input("Second Company Ticker", placeholder="Example: MSFT")
+     ticker1 = st.text_input("First Company Ticker", placeholder="Example: AAPL")
+     ticker2 = st.text_input("Second Company Ticker", placeholder="Example: MSFT")
 
-    if st.button("Compare Companies"):
+     if st.button("Compare Companies"):
         if ticker1 and ticker2:
             data1 = get_stock_data(ticker1)
             data2 = get_stock_data(ticker2)
