@@ -1,8 +1,8 @@
 import os
 from datetime import datetime
 import streamlit as st
-from utils import get_stock_data, get_price_history, extract_pdf_text, calculate_dcf
-from prompts import equity_prompt, pdf_report_prompt, comparison_prompt
+from utils import get_stock_data, get_price_history, extract_pdf_text, calculate_dcf, get_stock_news
+from prompts import equity_prompt, pdf_report_prompt, comparison_prompt, news_sentiment_prompt
 from ai import get_ai_analysis
 from report_generator import create_pdf_report
 
@@ -63,7 +63,8 @@ section = st.sidebar.radio(
         "Annual Report PDF",
         "DCF Calculator",
         "Company Comparison",
-        "Portfolio Tracker"
+        "Portfolio Tracker",
+        "News Sentiment"
     ]
 )
 
@@ -288,3 +289,37 @@ if section == "Portfolio Tracker":
         st.table(portfolio)
 
         st.metric("Total Portfolio Value", f"${total_value:,.2f}")
+
+
+if section == "News Sentiment":
+    st.markdown("## 📰 News Sentiment Analysis")
+
+    news_ticker = st.text_input(
+        "Enter Stock Ticker for News",
+        placeholder="Example: AAPL"
+    )
+
+    if st.button("Analyze News Sentiment"):
+        if not news_ticker:
+            st.warning("Please enter a ticker.")
+        else:
+            with st.spinner("Fetching recent news..."):
+                articles = get_stock_news(news_ticker)
+
+            if not articles:
+                st.warning("No recent news found.")
+            else:
+                st.subheader("Recent News")
+
+                for article in articles:
+                    st.write(f"**{article['Title']}**")
+                    st.write(f"Publisher: {article['Publisher']}")
+                    st.write(article["Link"])
+
+                prompt = news_sentiment_prompt(news_ticker, articles)
+
+                with st.spinner("Analyzing news sentiment..."):
+                    sentiment = get_ai_analysis(prompt)
+
+                st.subheader("AI News Sentiment")
+                st.markdown(sentiment)

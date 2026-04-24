@@ -89,3 +89,23 @@ Provide:
 
 Be concise and analytical.
 """
+
+def news_sentiment_prompt(ticker, articles):
+    return f"""
+You are an equity research analyst.
+
+Analyze the sentiment of the following recent news for {ticker.upper()}.
+
+News Articles:
+{articles}
+
+Give the output in this format:
+
+1. Overall News Sentiment: Positive / Neutral / Negative
+2. Key Themes
+3. Potential Impact on Stock
+4. Risks or Concerns
+5. Short Investment Takeaway
+
+Be concise. Do not invent details beyond the headlines and sources provided.
+"""
