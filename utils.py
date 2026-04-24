@@ -77,10 +77,17 @@ def get_stock_news(ticker):
     articles = []
 
     for item in news[:5]:
-        articles.append({
-            "Title": item.get("title"),
-            "Publisher": item.get("publisher"),
-            "Link": item.get("link")
-        })
+        content = item.get("content", {})
+
+        title = content.get("title")
+        publisher = content.get("provider", {}).get("displayName")
+        link = content.get("canonicalUrl", {}).get("url")
+
+        if title:
+            articles.append({
+                "Title": title,
+                "Publisher": publisher,
+                "Link": link
+            })
 
     return articles
