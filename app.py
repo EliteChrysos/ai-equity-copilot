@@ -126,7 +126,7 @@ if section == "Stock Analysis":
 
 
 if section == "Annual Report PDF":
-   st.markdown("## 📄 Annual Report PDF")
+    st.header("Analyze Annual Report PDF")
 
     uploaded_file = st.file_uploader("Upload annual report PDF", type=["pdf"])
 
