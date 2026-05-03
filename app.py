@@ -5,6 +5,7 @@ from utils import get_stock_data, get_price_history, extract_pdf_text, calculate
 from prompts import equity_prompt, pdf_report_prompt, comparison_prompt, news_sentiment_prompt
 from ai import get_ai_analysis
 from report_generator import create_pdf_report
+from rag import build_vector_store, answer_question_with_rag
 
 
 
@@ -61,6 +62,7 @@ section = st.sidebar.radio(
     [
         "Stock Analysis",
         "Annual Report PDF",
+        "Document Q&A (RAG)",
         "DCF Calculator",
         "Company Comparison",
         "Portfolio Tracker",
@@ -323,3 +325,83 @@ if section == "News Sentiment":
 
                 st.subheader("AI News Sentiment")
                 st.markdown(sentiment)
+
+
+
+if section == "Document Q&A (RAG)":
+    st.markdown("## 📚 Document Q&A with RAG")
+
+    st.write(
+        "Upload annual reports, earnings call transcripts, financial PDFs, or company notes. "
+        "Then ask questions and get citation-backed answers."
+    )
+
+
+    # to upload doc
+    uploaded_docs = st.file_uploader(
+        "Upload documents",
+        type=["pdf", "txt", "md"],
+        accept_multiple_files=True
+        # upload more than one file
+    )
+
+    if "rag_vector_store" not in st.session_state:
+        # streamlit reruns script at every click, store FIASS index in session state, once indexed app remembers them during session
+        st.session_state.rag_vector_store = None
+
+    if "rag_indexed_files" not in st.session_state:
+        st.session_state.rag_indexed_files = []
+
+    if st.button("Index Documents"):
+        if not uploaded_docs:
+            st.warning("Please upload at least one document.")
+        else:
+            with st.spinner("Reading, chunking, embedding, and indexing documents..."):
+                vector_store, chunk_count = build_vector_store(uploaded_docs)
+
+            if vector_store is None:
+                st.error("No supported documents were found. Please upload PDF, TXT, or MD files.")
+            else:
+                st.session_state.rag_vector_store = vector_store
+                st.session_state.rag_indexed_files = [file.name for file in uploaded_docs]
+                st.session_state.rag_chunk_count = chunk_count
+
+                st.success(f"Indexed {len(uploaded_docs)} file(s) into {chunk_count} searchable chunks.")
+
+    if st.session_state.rag_vector_store is not None:
+        st.info(
+            "Indexed files: "
+            + ", ".join(st.session_state.rag_indexed_files)
+        )
+
+        question = st.text_area(
+            "Ask a question about the uploaded documents",
+            placeholder="Example: What are the main risk factors mentioned in the annual report?"
+        )
+
+        k = st.slider(
+            "Number of document chunks to retrieve",
+            min_value=3,
+            max_value=10,
+            value=5
+        )
+
+        if st.button("Ask Documents"):
+            if not question:
+                st.warning("Please enter a question.")
+            else:
+                with st.spinner("Retrieving relevant chunks and generating grounded answer..."):
+                    answer, sources = answer_question_with_rag(
+                        question=question,
+                        vector_store=st.session_state.rag_vector_store,
+                        k=k
+                    )
+
+                st.subheader("Answer")
+                st.markdown(answer)
+
+                st.subheader("Retrieved Sources")
+
+                for i, source in enumerate(sources, start=1):
+                    with st.expander(f"Source {i}: {source['Source']} — Page {source['Page']}"):
+                        st.write(source["Preview"])
