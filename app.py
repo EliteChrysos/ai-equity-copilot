@@ -7,7 +7,7 @@ from ai import get_ai_analysis
 from report_generator import create_pdf_report
 from rag import build_vector_store, answer_question_with_rag
 from chat_memory import answer_with_memory
-
+from agent_workflow import run_investment_agent
 
 
 st.markdown("""
@@ -62,13 +62,14 @@ section = st.sidebar.radio(
     "Navigation",
     [
         "Stock Analysis",
+        "Research Chat",
         "Annual Report PDF",
-        "Document Q&A (RAG)",
+        "Document Q&A (RAG)",        
+        "Agent Investment Memo",
         "DCF Calculator",
         "Company Comparison",
         "Portfolio Tracker",
-        "News Sentiment",
-        "Research Chat"
+        "News Sentiment"
     ]
 )
 
@@ -358,22 +359,7 @@ if section == "Document Q&A (RAG)":
     if "rag_indexed_files" not in st.session_state:
         st.session_state.rag_indexed_files = []
 
-    if st.button("Index Documents"):
-        if not uploaded_docs:
-            st.warning("Please upload at least one document.")
-        else:
-            with st.spinner("Reading, chunking, embedding, and indexing documents..."):
-                vector_store, chunk_count = build_vector_store(uploaded_docs)
-
-            if vector_store is None:
-                st.error("No supported documents were found. Please upload PDF, TXT, or MD files.")
-            else:
-                st.session_state.rag_vector_store = vector_store
-                st.session_state.rag_indexed_files = [file.name for file in uploaded_docs]
-                st.session_state.rag_chunk_count = chunk_count
-
-                st.success(f"Indexed {len(uploaded_docs)} file(s) into {chunk_count} searchable chunks.")
-
+    
     if st.session_state.rag_vector_store is not None:
         st.info(
             "Indexed files: "
@@ -392,25 +378,34 @@ if section == "Document Q&A (RAG)":
             value=5
         )
 
-        if st.button("Ask Documents"):
-            if not question:
-                st.warning("Please enter a question.")
+        if st.button("Index Documents"):
+            if not uploaded_docs:
+                st.warning("Please upload at least one document.")
             else:
-                with st.spinner("Retrieving relevant chunks and generating grounded answer..."):
-                    answer, sources = answer_question_with_rag(
-                        question=question,
-                        vector_store=st.session_state.rag_vector_store,
-                        k=k
-                    )
-
-                st.subheader("Answer")
-                st.markdown(answer)
-
-                st.subheader("Retrieved Sources")
-
-                for i, source in enumerate(sources, start=1):
-                    with st.expander(f"Source {i}: {source['Source']} — Page {source['Page']}"):
-                        st.write(source["Preview"])
+                current_file_signature = [
+                    (file.name, file.size) for file in uploaded_docs
+                ]
+        
+                already_indexed = (
+                    st.session_state.rag_vector_store is not None
+                    and st.session_state.get("rag_file_signature") == current_file_signature
+                )
+        
+                if already_indexed:
+                    st.info("These documents are already indexed. You can ask questions directly.")
+                else:
+                    with st.spinner("Reading, chunking, embedding, and indexing documents..."):
+                        vector_store, chunk_count = build_vector_store(uploaded_docs)
+        
+                    if vector_store is None:
+                        st.error("No supported documents were found. Please upload PDF, TXT, or MD files.")
+                    else:
+                        st.session_state.rag_vector_store = vector_store
+                        st.session_state.rag_indexed_files = [file.name for file in uploaded_docs]
+                        st.session_state.rag_chunk_count = chunk_count
+                        st.session_state.rag_file_signature = current_file_signature
+        
+                        st.success(f"Indexed {len(uploaded_docs)} file(s) into {chunk_count} searchable chunks.")
 
 
 if section == "Research Chat":
@@ -474,3 +469,117 @@ Last AI analysis:
     if st.button("Clear Chat Memory"):
         st.session_state.chat_messages = []
         st.success("Chat memory cleared.")
+
+
+
+if section == "Agent Investment Memo":
+    st.markdown("## 🤖 Agentic Investment Memo")
+
+    st.write(
+        "This workflow retrieves documents, fetches financial data, compares peers, "
+        "runs DCF valuation, analyzes risks, and generates a final investment memo."
+    )
+
+    agent_ticker = st.text_input(
+        "Target Company Ticker",
+        placeholder="Example: AAPL, MSFT, RELIANCE.NS"
+    )
+
+    peer_input = st.text_input(
+        "Peer Tickers",
+        placeholder="Example: MSFT, GOOGL, AMZN"
+    )
+
+    peer_tickers = [
+        peer.strip().upper()
+        for peer in peer_input.split(",")
+        if peer.strip()
+    ]
+
+    st.subheader("DCF Assumptions")
+
+    free_cash_flow = st.number_input(
+        "Free Cash Flow",
+        value=1000000000.0,
+        key="agent_fcf"
+    )
+
+    growth_rate = st.number_input(
+        "Growth Rate (%)",
+        value=5.0,
+        key="agent_growth"
+    ) / 100
+
+    discount_rate = st.number_input(
+        "Discount Rate (%)",
+        value=10.0,
+        key="agent_discount"
+    ) / 100
+
+    terminal_growth_rate = st.number_input(
+        "Terminal Growth Rate (%)",
+        value=2.5,
+        key="agent_terminal"
+    ) / 100
+
+    shares_outstanding = st.number_input(
+        "Shares Outstanding",
+        value=1000000000.0,
+        key="agent_shares"
+    )
+
+    use_rag = st.checkbox(
+        "Use indexed RAG documents if available",
+        value=True
+    )
+
+    vector_store = None
+
+    if use_rag and "rag_vector_store" in st.session_state:
+        vector_store = st.session_state.rag_vector_store
+        st.info("RAG document index found and will be used.")
+    else:
+        st.warning("No RAG document index found. The agent will use financial data only.")
+
+    if st.button("Run Agentic Analysis"):
+        if not agent_ticker:
+            st.warning("Please enter a target ticker.")
+        else:
+            dcf_inputs = {
+                "free_cash_flow": free_cash_flow,
+                "growth_rate": growth_rate,
+                "discount_rate": discount_rate,
+                "terminal_growth_rate": terminal_growth_rate,
+                "shares_outstanding": shares_outstanding
+            }
+
+            with st.spinner("Running multi-step investment research workflow..."):
+                result = run_investment_agent(
+                    ticker=agent_ticker,
+                    peer_tickers=peer_tickers,
+                    vector_store=vector_store,
+                    dcf_inputs=dcf_inputs
+                )
+
+            st.subheader("Workflow Plan")
+            st.markdown(result["task_plan"])
+
+            st.subheader("Final Investment Memo")
+            st.markdown(result["final_memo"])
+
+            with st.expander("Peer Analysis"):
+                st.markdown(result["peer_analysis"])
+
+            with st.expander("Risk Analysis"):
+                st.markdown(result["risk_analysis"])
+
+            with st.expander("DCF Result"):
+                st.write(result["dcf_result"])
+
+            with st.expander("Retrieved Document Sources"):
+                if result["retrieved_sources"]:
+                    for i, source in enumerate(result["retrieved_sources"], start=1):
+                        st.write(f"**Source {i}: {source['Source']} — Page {source['Page']}**")
+                        st.write(source["Preview"])
+                else:
+                    st.write("No document sources were used.")

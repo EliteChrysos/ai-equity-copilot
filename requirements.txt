@@ -12,3 +12,5 @@ langchain-text-splitters
 faiss-cpu
 fastembed
 pypdf
+langgraph
+cryptography

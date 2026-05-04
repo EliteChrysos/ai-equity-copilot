@@ -1,6 +1,7 @@
 import os
 import tempfile
 
+from functools import lru_cache
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
@@ -51,12 +52,18 @@ def load_uploaded_documents(uploaded_files):
 def split_documents(documents):
     # Annual reports are too long to send to claude all at once
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200
+        chunk_size=1500,
+        chunk_overlap=150
     )
 
     chunks = splitter.split_documents(documents)
     return chunks
+
+@lru_cache(maxsize=1)
+def get_embeddings():
+    return FastEmbedEmbeddings(
+        model_name="BAAI/bge-small-en-v1.5"
+    )
 
 
 def build_vector_store(uploaded_files):
@@ -68,9 +75,7 @@ def build_vector_store(uploaded_files):
     chunks = split_documents(documents)
 
     # embeddings converts the text to numbers that represent meaning
-    embeddings = FastEmbedEmbeddings(
-        model_name="BAAI/bge-small-en-v1.5"
-    )
+    embeddings = get_embeddings()
 
     # FAISS - search engine , when user asks question, it finds most relevant chunk
     vector_store = FAISS.from_documents(
