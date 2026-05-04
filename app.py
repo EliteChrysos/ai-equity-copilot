@@ -8,6 +8,7 @@ from report_generator import create_pdf_report
 from rag import build_vector_store, answer_question_with_rag
 from chat_memory import answer_with_memory
 from agent_workflow import run_investment_agent
+from evaluation import evaluate_response
 
 
 st.markdown("""
@@ -333,8 +334,6 @@ if section == "News Sentiment":
                 st.subheader("AI News Sentiment")
                 st.markdown(sentiment)
 
-
-
 if section == "Document Q&A (RAG)":
     st.markdown("## 📚 Document Q&A with RAG")
 
@@ -343,71 +342,149 @@ if section == "Document Q&A (RAG)":
         "Then ask questions and get citation-backed answers."
     )
 
-
-    # to upload doc
     uploaded_docs = st.file_uploader(
         "Upload documents",
         type=["pdf", "txt", "md"],
-        accept_multiple_files=True
-        # upload more than one file
+        accept_multiple_files=True,
+        key="rag_file_uploader"
     )
 
     if "rag_vector_store" not in st.session_state:
-        # streamlit reruns script at every click, store FIASS index in session state, once indexed app remembers them during session
         st.session_state.rag_vector_store = None
 
     if "rag_indexed_files" not in st.session_state:
         st.session_state.rag_indexed_files = []
 
-    
+    if "rag_file_signature" not in st.session_state:
+        st.session_state.rag_file_signature = None
+
+    if "rag_last_answer" not in st.session_state:
+        st.session_state.rag_last_answer = None
+
+    if "rag_last_sources" not in st.session_state:
+        st.session_state.rag_last_sources = []
+
+    if "rag_last_evaluation" not in st.session_state:
+        st.session_state.rag_last_evaluation = None
+
+    st.markdown("### Step 1: Index Documents")
+
+    if st.button("Index Documents", key="rag_index_button"):
+        if not uploaded_docs:
+            st.warning("Please upload at least one document.")
+        else:
+            current_file_signature = [
+                (file.name, file.size) for file in uploaded_docs
+            ]
+
+            already_indexed = (
+                st.session_state.rag_vector_store is not None
+                and st.session_state.rag_file_signature == current_file_signature
+            )
+
+            if already_indexed:
+                st.info("These documents are already indexed. You can ask questions directly.")
+            else:
+                with st.spinner("Reading, chunking, embedding, and indexing documents..."):
+                    vector_store, chunk_count = build_vector_store(uploaded_docs)
+
+                if vector_store is None:
+                    st.error("No supported documents were found. Please upload PDF, TXT, or MD files.")
+                else:
+                    st.session_state.rag_vector_store = vector_store
+                    st.session_state.rag_indexed_files = [file.name for file in uploaded_docs]
+                    st.session_state.rag_chunk_count = chunk_count
+                    st.session_state.rag_file_signature = current_file_signature
+
+                    st.session_state.rag_last_answer = None
+                    st.session_state.rag_last_sources = []
+                    st.session_state.rag_last_evaluation = None
+
+                    st.success(
+                        f"Indexed {len(uploaded_docs)} file(s) into {chunk_count} searchable chunks."
+                    )
+
     if st.session_state.rag_vector_store is not None:
         st.info(
             "Indexed files: "
             + ", ".join(st.session_state.rag_indexed_files)
         )
 
+        st.markdown("### Step 2: Ask Questions")
+
         question = st.text_area(
             "Ask a question about the uploaded documents",
-            placeholder="Example: What are the main risk factors mentioned in the annual report?"
+            placeholder="Example: What are the main risk factors mentioned in the annual report?",
+            key="rag_question_input"
         )
 
         k = st.slider(
             "Number of document chunks to retrieve",
             min_value=3,
             max_value=10,
-            value=5
+            value=5,
+            key="rag_chunk_slider"
         )
 
-        if st.button("Index Documents"):
-            if not uploaded_docs:
-                st.warning("Please upload at least one document.")
+        if st.button("Ask Documents", key="rag_ask_button"):
+            if not question:
+                st.warning("Please enter a question.")
             else:
-                current_file_signature = [
-                    (file.name, file.size) for file in uploaded_docs
-                ]
-        
-                already_indexed = (
-                    st.session_state.rag_vector_store is not None
-                    and st.session_state.get("rag_file_signature") == current_file_signature
-                )
-        
-                if already_indexed:
-                    st.info("These documents are already indexed. You can ask questions directly.")
-                else:
-                    with st.spinner("Reading, chunking, embedding, and indexing documents..."):
-                        vector_store, chunk_count = build_vector_store(uploaded_docs)
-        
-                    if vector_store is None:
-                        st.error("No supported documents were found. Please upload PDF, TXT, or MD files.")
-                    else:
-                        st.session_state.rag_vector_store = vector_store
-                        st.session_state.rag_indexed_files = [file.name for file in uploaded_docs]
-                        st.session_state.rag_chunk_count = chunk_count
-                        st.session_state.rag_file_signature = current_file_signature
-        
-                        st.success(f"Indexed {len(uploaded_docs)} file(s) into {chunk_count} searchable chunks.")
+                with st.spinner("Retrieving relevant chunks and generating grounded answer..."):
+                    answer, sources = answer_question_with_rag(
+                        question=question,
+                        vector_store=st.session_state.rag_vector_store,
+                        k=k
+                    )
+
+                evaluation = evaluate_response(answer)
+
+                st.session_state.rag_last_answer = answer
+                st.session_state.rag_last_sources = sources
+                st.session_state.rag_last_evaluation = evaluation
+
+    if st.session_state.rag_last_answer is not None:
+        st.subheader("Answer")
+        st.markdown(st.session_state.rag_last_answer)
+
+        st.subheader("Response Quality Check")
+
+        evaluation = st.session_state.rag_last_evaluation
+
+        st.metric(
+            "Evaluation Score",
+            f"{evaluation['score']} / {evaluation['total']}"
+        )
+
+        for check_name, passed in evaluation["results"].items():
+            if passed:
+                st.success(f"✅ {check_name}")
+            else:
+                st.error(f"❌ {check_name}")
+
+        st.subheader("User Feedback")
+
+        feedback_col1, feedback_col2 = st.columns(2)
+
+        with feedback_col1:
+            if st.button("👍 Good Answer", key="rag_good_feedback"):
+                st.session_state.last_feedback = "positive"
+                st.success("Feedback saved: Good Answer")
+
+        with feedback_col2:
+            if st.button("👎 Needs Improvement", key="rag_bad_feedback"):
+                st.session_state.last_feedback = "negative"
+                st.warning("Feedback saved: Needs Improvement")
+
+        st.subheader("Retrieved Sources")
+
+        for i, source in enumerate(st.session_state.rag_last_sources, start=1):
+            with st.expander(f"Source {i}: {source['Source']} — Page {source['Page']}"):
+                st.write(source["Preview"])
 
 
+
+                
 if section == "Research Chat":
     st.markdown("## 💬 Research Chat with Memory")
 
