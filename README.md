@@ -74,7 +74,7 @@ Upload a company’s financial documents (PDFs, reports, notes) and extract:
 
 ---
 
-### 🤖 Agentic Investment Workflow (NEW)
+### 🤖 Agentic Investment Workflow
 
 Automatically generate a complete investment memo using a multi-step AI workflow:
 
@@ -96,7 +96,7 @@ Automatically generate a complete investment memo using a multi-step AI workflow
 
 ---
 
-### 💬 Research Chat with Memory (NEW)
+### 💬 Research Chat with Memory 
 
 Ask follow-up questions with context awareness:
 
@@ -181,7 +181,7 @@ Useful for:
 
 ---
 
-### 🧠 AI Response Evaluation (NEW)
+### 🧠 AI Response Evaluation 
 
 Basic quality checks for AI responses:
 
