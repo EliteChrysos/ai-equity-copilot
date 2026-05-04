@@ -6,6 +6,7 @@ from prompts import equity_prompt, pdf_report_prompt, comparison_prompt, news_se
 from ai import get_ai_analysis
 from report_generator import create_pdf_report
 from rag import build_vector_store, answer_question_with_rag
+from chat_memory import answer_with_memory
 
 
 
@@ -66,7 +67,8 @@ section = st.sidebar.radio(
         "DCF Calculator",
         "Company Comparison",
         "Portfolio Tracker",
-        "News Sentiment"
+        "News Sentiment",
+        "Research Chat"
     ]
 )
 
@@ -105,6 +107,10 @@ if section == "Stock Analysis":
 
             st.subheader("AI Equity Research Report")
             st.markdown(analysis)
+
+            st.session_state.last_ticker = ticker.upper()
+            st.session_state.last_stock_data = data
+            st.session_state.last_stock_analysis = analysis
 
             st.download_button(
                 label="Download Report",
@@ -405,3 +411,66 @@ if section == "Document Q&A (RAG)":
                 for i, source in enumerate(sources, start=1):
                     with st.expander(f"Source {i}: {source['Source']} — Page {source['Page']}"):
                         st.write(source["Preview"])
+
+
+if section == "Research Chat":
+    st.markdown("## 💬 Research Chat with Memory")
+
+    st.write(
+        "Ask follow-up questions about your previous analysis. "
+        "The assistant can remember the current session context."
+    )
+
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
+    current_context = ""
+
+    if "last_ticker" in st.session_state:
+        current_context += f"""
+Last analyzed ticker: {st.session_state.last_ticker}
+
+Last stock data:
+{st.session_state.last_stock_data}
+
+Last AI analysis:
+{st.session_state.last_stock_analysis}
+"""
+
+        st.info(f"Current memory context: {st.session_state.last_ticker}")
+    else:
+        st.warning("No stock analysis in memory yet. Analyze a stock first, then come back here.")
+
+    for message in st.session_state.chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    user_question = st.chat_input("Ask a follow-up question...")
+
+    if user_question:
+        st.session_state.chat_messages.append({
+            "role": "user",
+            "content": user_question
+        })
+
+        with st.chat_message("user"):
+            st.markdown(user_question)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking with conversation memory..."):
+                response = answer_with_memory(
+                    user_question=user_question,
+                    chat_history=st.session_state.chat_messages,
+                    current_context=current_context
+                )
+
+            st.markdown(response)
+
+        st.session_state.chat_messages.append({
+            "role": "assistant",
+            "content": response
+        })
+
+    if st.button("Clear Chat Memory"):
+        st.session_state.chat_messages = []
+        st.success("Chat memory cleared.")
